@@ -7,10 +7,15 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.logging.LogUtils;
 
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.ClientRegistry;
+import net.minecraftforge.client.event.ScreenEvent.KeyboardKeyPressedEvent;
+import net.minecraftforge.client.event.ScreenEvent.KeyboardKeyReleasedEvent;
 import net.minecraftforge.client.settings.KeyConflictContext;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent.ClientTickEvent;
@@ -36,6 +41,8 @@ public class QuickStore {
 		DistExecutor.runWhenOn(Dist.CLIENT, () -> () -> {
 			FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setupClient);
 			MinecraftForge.EVENT_BUS.addListener(this::clientTick);
+			MinecraftForge.EVENT_BUS.addListener(this::screenKeyPressed);
+			MinecraftForge.EVENT_BUS.addListener(this::screenKeyReleased);
 		});
 		FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
 
@@ -47,12 +54,23 @@ public class QuickStore {
 	public void setupClient(FMLClientSetupEvent event) {
 		ClientRegistry.registerKeyBinding(store);
 	}
-	
+	@OnlyIn(Dist.CLIENT)
+	public void screenKeyPressed(KeyboardKeyPressedEvent.Pre event) {
+		if (!nomore && store.getKey().getValue() == event.getKeyCode()) {
+			nomore = true;
+			QuickStore.channel.sendToServer(new QuickStorePacket());
+		}
+	}
+	@OnlyIn(Dist.CLIENT)
+	public void screenKeyReleased(KeyboardKeyReleasedEvent.Pre event) {
+		if (nomore && store.getKey().getValue() == event.getKeyCode()) {
+			nomore = false;
+		}
+	}
 	@OnlyIn(Dist.CLIENT)
 	public void clientTick(ClientTickEvent event) {
-		//if (!nomore && store.isDown()) {
 		if (store.consumeClick()) {
-			//nomore = true;
+			nomore = false;
 			QuickStore.channel.sendToServer(new QuickStorePacket());
 		}
 		//if (nomore && !store.isDown()) {
