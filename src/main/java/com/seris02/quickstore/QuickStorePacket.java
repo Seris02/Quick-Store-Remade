@@ -11,6 +11,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.AbstractChestBlock;
@@ -90,15 +91,10 @@ public class QuickStorePacket {
 		ctx.get().setPacketHandled(true);
 	}
 	
-	public static void quickStoreToContainerMenu(AbstractContainerMenu a, List<ItemStack> items) {
-		Container ce = null;
-		for (Slot x : a.slots) {
-			if (x.container != null && !(x.container instanceof Inventory)) {
-				ce = x.container;
-			}
-		}
-		if (ce == null) return;
+	public static void quickStoreToContainer(Container ce, List<ItemStack> items) {
+		if (ce == null || ce.isEmpty()) return;
 		for (ItemStack s : items) {
+			if (s.isEmpty()) continue;
 			if (ce.countItem(s.getItem()) > 0) {
 				InvWrapper invw = new InvWrapper(ce);
 				for (int n = 0; n < ce.getContainerSize(); n++) {
@@ -117,9 +113,13 @@ public class QuickStorePacket {
 		ServerLevel l = p.getLevel();
 		List<ItemStack> items = QuickStorePacket.getInventoryMinusHotbarAndArmor(p.getInventory());
 		PQueue<Container> pqueue = new PQueue<Container>();
-		if (p.containerMenu != null) {
-			quickStoreToContainerMenu(p.containerMenu, items);
-			return;
+		if (p.containerMenu != null && !(p.containerMenu instanceof InventoryMenu)) {
+			for (Slot x : p.containerMenu.slots) {
+				if (x.container != null && !(x.container instanceof Inventory)) {
+					quickStoreToContainer(x.container, items);
+					return;
+				}
+			}
 		}
 		for (int x = -5; x <= 5; x++) {
 			for (int y = -5; y <= 5; y++) {
@@ -132,22 +132,7 @@ public class QuickStorePacket {
 			}
 		}
 		while (pqueue.first != null) {
-			Container ce = pqueue.dequeue();
-			if (!ce.isEmpty()) {
-				for (ItemStack s : items) {
-					if (ce.countItem(s.getItem()) > 0) {
-						InvWrapper invw = new InvWrapper(ce);
-						for (int n = 0; n < ce.getContainerSize(); n++) {
-							if (invw.getStackInSlot(n).isEmpty()) continue;
-							ItemStack d = invw.getStackInSlot(n);
-							if (invw.isItemValid(n, s) && ItemStack.isSameItemSameTags(s, d)) {
-								moveItemStackTo(s, 0, ce.getContainerSize(), false, ce);
-							}
-							if (s.isEmpty()) break;
-						}
-					}
-				}
-			}
+			quickStoreToContainer(pqueue.dequeue(), items);
 		}
 	}
 	
